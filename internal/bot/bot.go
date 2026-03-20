@@ -90,13 +90,17 @@ func (b *Bot) Run(ctx context.Context) error {
 
 		case <-ctx.Done():
 			b.logger.Info("shutdown signal received — stopping strategy")
-			stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer stopCancel()
-			if stopErr := b.strategy.Stop(stopCtx, b.exchange); stopErr != nil {
-				b.logger.Error("strategy stop error", zap.Error(stopErr))
-			}
+			b.stopStrategy()
 			return nil
 		}
+	}
+}
+
+func (b *Bot) stopStrategy() {
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopCancel()
+	if err := b.strategy.Stop(stopCtx, b.exchange); err != nil {
+		b.logger.Error("strategy stop error", zap.Error(err))
 	}
 }
 
