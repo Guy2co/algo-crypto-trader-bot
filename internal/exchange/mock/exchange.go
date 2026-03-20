@@ -193,8 +193,27 @@ func (m *Exchange) CancelOrder(_ context.Context, _ string, orderID int64) error
 	if !ok {
 		return fmt.Errorf("order %d not found", orderID)
 	}
+	m.unlockFunds(order)
+	delete(m.openOrders, orderID)
+	return nil
+}
 
-	// Unlock funds
+func (m *Exchange) CancelAllOrders(_ context.Context, symbol string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for id, order := range m.openOrders {
+		if order.Symbol != symbol {
+			continue
+		}
+		m.unlockFunds(order)
+		delete(m.openOrders, id)
+	}
+	return nil
+}
+
+// unlockFunds releases the reserved balance for a cancelled order. Must be called with mu held.
+func (m *Exchange) unlockFunds(order exchange.Order) {
 	switch order.Side {
 	case exchange.OrderSideBuy:
 		cost := order.Quantity * order.Price
@@ -209,36 +228,6 @@ func (m *Exchange) CancelOrder(_ context.Context, _ string, orderID int64) error
 		base.Free += order.Quantity
 		m.balances[baseAsset] = base
 	}
-
-	delete(m.openOrders, orderID)
-	return nil
-}
-
-func (m *Exchange) CancelAllOrders(_ context.Context, symbol string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for id, order := range m.openOrders {
-		if order.Symbol != symbol {
-			continue
-		}
-		switch order.Side {
-		case exchange.OrderSideBuy:
-			cost := order.Quantity * order.Price
-			quote := m.balances["USDT"]
-			quote.Locked = math.Max(0, quote.Locked-cost)
-			quote.Free += cost
-			m.balances["USDT"] = quote
-		case exchange.OrderSideSell:
-			baseAsset := order.Symbol[:len(order.Symbol)-4]
-			base := m.balances[baseAsset]
-			base.Locked = math.Max(0, base.Locked-order.Quantity)
-			base.Free += order.Quantity
-			m.balances[baseAsset] = base
-		}
-		delete(m.openOrders, id)
-	}
-	return nil
 }
 
 func (m *Exchange) GetOrder(_ context.Context, _ string, orderID int64) (*exchange.Order, error) {

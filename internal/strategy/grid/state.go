@@ -1,12 +1,11 @@
 package grid
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/Guy2co/algo-crypto-trader-bot/internal/state"
 )
 
 // GridLevel represents one price level in the grid.
@@ -53,34 +52,17 @@ func statePath(stateDir, symbol string) string {
 // save persists the GridState to disk as JSON. Must not be called with mu held.
 func (s *GridState) save(stateDir string) error {
 	s.mu.RLock()
-	data, err := json.MarshalIndent(s, "", "  ")
+	err := state.SaveJSON(statePath(stateDir, s.Symbol), s)
 	s.mu.RUnlock()
-
-	if err != nil {
-		return fmt.Errorf("marshal grid state: %w", err)
-	}
-
-	path := statePath(stateDir, s.Symbol)
-	if err = os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("write grid state to %s: %w", path, err)
-	}
-	return nil
+	return err
 }
 
 // loadState loads GridState from disk. Returns (nil, nil) if no file exists.
 func loadState(stateDir, symbol string) (*GridState, error) {
-	path := statePath(stateDir, symbol)
-	data, err := os.ReadFile(path) //nolint:gosec
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read grid state from %s: %w", path, err)
-	}
-
 	var s GridState
-	if err = json.Unmarshal(data, &s); err != nil {
-		return nil, fmt.Errorf("unmarshal grid state: %w", err)
+	found, err := state.LoadJSON(statePath(stateDir, symbol), &s)
+	if err != nil || !found {
+		return nil, err
 	}
 	return &s, nil
 }

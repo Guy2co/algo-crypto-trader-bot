@@ -1,12 +1,11 @@
 package arbitrage
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/Guy2co/algo-crypto-trader-bot/internal/state"
 )
 
 // ArbMetrics tracks running performance of the arbitrage strategy.
@@ -33,30 +32,16 @@ func arbStatePath(stateDir string) string {
 
 func (s *ArbState) save(stateDir string) error {
 	s.mu.RLock()
-	data, err := json.MarshalIndent(s, "", "  ")
+	err := state.SaveJSON(arbStatePath(stateDir), s)
 	s.mu.RUnlock()
-	if err != nil {
-		return fmt.Errorf("marshal arb state: %w", err)
-	}
-	path := arbStatePath(stateDir)
-	if err = os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("write arb state to %s: %w", path, err)
-	}
-	return nil
+	return err
 }
 
 func loadArbState(stateDir string) (*ArbState, error) {
-	path := arbStatePath(stateDir)
-	data, err := os.ReadFile(path) //nolint:gosec
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read arb state from %s: %w", path, err)
-	}
 	var s ArbState
-	if err = json.Unmarshal(data, &s); err != nil {
-		return nil, fmt.Errorf("unmarshal arb state: %w", err)
+	found, err := state.LoadJSON(arbStatePath(stateDir), &s)
+	if err != nil || !found {
+		return nil, err
 	}
 	return &s, nil
 }
