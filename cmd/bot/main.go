@@ -59,29 +59,9 @@ func run() error {
 		return fmt.Errorf("init exchange: %w", err)
 	}
 
-	var strat strategy.Strategy
-
-	if cfg.Strategy.Active == "arbitrage" {
-		// Build exchange list: always start with Binance.
-		exchanges := []binanceexchange.Exchange{primaryEx}
-
-		// Optionally add Bybit for cross-exchange arbitrage.
-		if bybitKey := os.Getenv("BYBIT_API_KEY"); bybitKey != "" {
-			bybitSecret := os.Getenv("BYBIT_SECRET_KEY")
-			bybitEx, bybitErr := bybitclient.NewClient(bybitKey, bybitSecret, cfg.Bybit.Testnet, log)
-			if bybitErr != nil {
-				return fmt.Errorf("init bybit exchange: %w", bybitErr)
-			}
-			exchanges = append(exchanges, bybitEx)
-			log.Info("bybit exchange enabled for cross-exchange arbitrage")
-		}
-
-		strat = arbitrage.New(cfg, exchanges, log)
-	} else {
-		strat, err = strategy.New(cfg.Strategy.Active, cfg, log)
-		if err != nil {
-			return fmt.Errorf("init strategy: %w", err)
-		}
+	strat, err := buildStrategy(cfg, primaryEx, log)
+	if err != nil {
+		return fmt.Errorf("init strategy: %w", err)
 	}
 
 	riskMgr := risk.New(cfg.Risk, log)
@@ -93,4 +73,23 @@ func run() error {
 	)
 
 	return b.Run(context.Background())
+}
+
+// buildStrategy creates the active strategy, optionally wiring a second exchange for arbitrage.
+func buildStrategy(cfg *config.Config, primaryEx binanceexchange.Exchange, log *zap.Logger) (strategy.Strategy, error) {
+	if cfg.Strategy.Active != "arbitrage" {
+		return strategy.New(cfg.Strategy.Active, cfg, log)
+	}
+
+	exchanges := []binanceexchange.Exchange{primaryEx}
+	if bybitKey := os.Getenv("BYBIT_API_KEY"); bybitKey != "" {
+		bybitEx, err := bybitclient.NewClient(bybitKey, os.Getenv("BYBIT_SECRET_KEY"), cfg.Bybit.Testnet, log)
+		if err != nil {
+			return nil, fmt.Errorf("init bybit exchange: %w", err)
+		}
+		exchanges = append(exchanges, bybitEx)
+		log.Info("bybit exchange enabled for cross-exchange arbitrage")
+	}
+
+	return arbitrage.New(cfg, exchanges, log), nil
 }

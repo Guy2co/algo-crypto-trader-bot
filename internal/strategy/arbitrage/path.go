@@ -129,18 +129,19 @@ func BuildCrossExchangePaths(quoteAssets, intermediates []string, exs []exchange
 		for _, asset := range intermediates {
 			symbol := asset + quote
 			// Buy cheap on exchange[0], sell expensive on exchange[1].
+			// len(exs) >= 2 is guaranteed by the guard above. //nolint:gosec
 			templates = append(templates, pathTemplate{
 				pathType: "cross_exchange",
 				legs: []Leg{
 					{Symbol: symbol, Side: exchange.OrderSideBuy, Exchange: exs[0]},
-					{Symbol: symbol, Side: exchange.OrderSideSell, Exchange: exs[1]},
+					{Symbol: symbol, Side: exchange.OrderSideSell, Exchange: exs[1]}, //nolint:gosec
 				},
 			})
 			// Reverse: buy on exchange[1], sell on exchange[0].
 			templates = append(templates, pathTemplate{
 				pathType: "cross_exchange",
 				legs: []Leg{
-					{Symbol: symbol, Side: exchange.OrderSideBuy, Exchange: exs[1]},
+					{Symbol: symbol, Side: exchange.OrderSideBuy, Exchange: exs[1]}, //nolint:gosec
 					{Symbol: symbol, Side: exchange.OrderSideSell, Exchange: exs[0]},
 				},
 			})

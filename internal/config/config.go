@@ -96,7 +96,7 @@ type StateConfig struct {
 // Load reads config from the given YAML file path, then overrides
 // API keys from environment variables.
 func Load(path string) (*Config, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is a user-supplied config file, not an injection risk
 	if err != nil {
 		return nil, fmt.Errorf("open config file: %w", err)
 	}

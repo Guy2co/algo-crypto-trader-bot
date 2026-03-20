@@ -45,7 +45,7 @@ func mapSpotGetOrder(r gobybit.SpotGetOrderResult) *exchange.Order {
 		Price:         price,
 		Quantity:      qty,
 		FilledQty:     filledQty,
-		Status:        mapOrderStatus(string(r.Status)),
+		Status:        mapOrderStatus(r.Status),
 		CreatedAt:     time.UnixMilli(createdAt),
 		UpdatedAt:     time.UnixMilli(updatedAt),
 	}

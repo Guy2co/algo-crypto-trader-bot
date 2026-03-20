@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func newTestStrategy(t *testing.T, bottom, top float64, count int, investment float64) (*Strategy, *mocexchange.Exchange) {
+func newTestStrategy(t *testing.T, bottom, top float64, count int, investment float64) (*Strategy, *mocexchange.Exchange) { //nolint:unparam
 	t.Helper()
 	balances := map[string]exchange.Balance{
 		"USDT": {Asset: "USDT", Free: investment * 2},
