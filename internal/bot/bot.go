@@ -56,8 +56,9 @@ func (b *Bot) Run(ctx context.Context) error {
 		return fmt.Errorf("strategy init: %w", err)
 	}
 
-	b.logger.Info("subscribing to order fill stream", zap.String("symbol", b.cfg.Grid.Symbol))
-	fillChan, cancelStream, err := b.exchange.SubscribeOrderFills(ctx, b.cfg.Grid.Symbol)
+	primarySym := b.primarySymbol()
+	b.logger.Info("subscribing to order fill stream", zap.String("symbol", primarySym))
+	fillChan, cancelStream, err := b.exchange.SubscribeOrderFills(ctx, primarySym)
 	if err != nil {
 		return fmt.Errorf("subscribe order fills: %w", err)
 	}
@@ -68,7 +69,7 @@ func (b *Bot) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get initial balances: %w", err)
 	}
-	price, err := b.exchange.GetCurrentPrice(ctx, b.cfg.Grid.Symbol)
+	price, err := b.exchange.GetCurrentPrice(ctx, primarySym)
 	if err != nil {
 		return fmt.Errorf("get initial price: %w", err)
 	}
@@ -78,7 +79,7 @@ func (b *Bot) Run(ctx context.Context) error {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
-	b.logger.Info("bot running — waiting for fills", zap.String("symbol", b.cfg.Grid.Symbol))
+	b.logger.Info("bot running — waiting for fills", zap.String("symbol", primarySym))
 
 	for {
 		select {
@@ -106,11 +107,29 @@ func (b *Bot) Run(ctx context.Context) error {
 	}
 }
 
+// primarySymbol returns the symbol used for fill subscriptions and equity tracking.
+// For the grid strategy this is cfg.Grid.Symbol; for arbitrage the first quote pair.
+func (b *Bot) primarySymbol() string {
+	if b.cfg.Strategy.Active == "arbitrage" {
+		quote := "USDT"
+		if len(b.cfg.Arbitrage.QuoteAssets) > 0 {
+			quote = b.cfg.Arbitrage.QuoteAssets[0]
+		}
+		intermediate := "BTC"
+		if len(b.cfg.Arbitrage.IntermediateAssets) > 0 {
+			intermediate = b.cfg.Arbitrage.IntermediateAssets[0]
+		}
+		return intermediate + quote
+	}
+	return b.cfg.Grid.Symbol
+}
+
 func (b *Bot) handleFillEvent(ctx context.Context, event exchange.OrderFillEvent) error {
 	if event.Status != exchange.OrderStatusFilled {
 		return nil
 	}
-	if event.Symbol != b.cfg.Grid.Symbol {
+	// For arbitrage the strategy handles its own fills; pass everything through.
+	if b.cfg.Strategy.Active != "arbitrage" && event.Symbol != b.cfg.Grid.Symbol {
 		return nil
 	}
 	if b.tracker.IsDuplicate(event.TradeID) {
@@ -141,7 +160,8 @@ func (b *Bot) onTick(ctx context.Context) {
 		b.logger.Warn("tick: get balances error", zap.Error(err))
 		return
 	}
-	price, err := b.exchange.GetCurrentPrice(ctx, b.cfg.Grid.Symbol)
+	primarySym := b.primarySymbol()
+	price, err := b.exchange.GetCurrentPrice(ctx, primarySym)
 	if err != nil {
 		b.logger.Warn("tick: get price error", zap.Error(err))
 		return

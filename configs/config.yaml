@@ -4,8 +4,14 @@ exchange:
   rest_timeout_secs: 10
   ws_reconnect_max_attempts: 10
 
+# Secondary exchange — optional, enables cross-exchange arbitrage.
+# Keys are provided via BYBIT_API_KEY / BYBIT_SECRET_KEY env vars.
+bybit:
+  testnet: false
+  rest_timeout_secs: 10
+
 strategy:
-  active: "grid"
+  active: "grid"  # "grid" | "arbitrage"
 
 grid:
   symbol: "BTCUSDT"
@@ -43,3 +49,17 @@ logging:
 state:
   dir: "./state"
   flush_interval_secs: 30
+
+# Arbitrage strategy configuration.
+# Set strategy.active: "arbitrage" to enable.
+arbitrage:
+  type: "triangular"              # "triangular" | "cross_exchange" | "both"
+  quote_assets: ["USDT"]         # base currencies for triangles
+  intermediate_assets: ["BTC", "ETH", "BNB", "SOL"]
+  max_hops: 3                    # 3 = triangular, 4 = quad-arb
+  min_profit_pct: 0.15           # minimum net profit % after all fees
+  max_trade_usdt: 500.0          # maximum USDT per arbitrage cycle
+  fee_rate: 0.001                # taker fee (0.1% on Binance/Bybit)
+  scan_interval_ms: 200          # price poll interval in milliseconds
+  order_timeout_secs: 5          # per-leg order execution timeout
+  dry_run: true                  # log opportunities without executing (start here)

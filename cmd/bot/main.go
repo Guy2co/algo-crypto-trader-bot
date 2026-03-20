@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"os"
 
-	binanceexchange "github.com/Guy2co/algo-crypto-trader-bot/internal/exchange/binance"
-	"github.com/Guy2co/algo-crypto-trader-bot/internal/risk"
-	"github.com/Guy2co/algo-crypto-trader-bot/internal/strategy"
 	"github.com/Guy2co/algo-crypto-trader-bot/internal/bot"
 	"github.com/Guy2co/algo-crypto-trader-bot/internal/config"
+	binanceexchange "github.com/Guy2co/algo-crypto-trader-bot/internal/exchange"
+	binanceclient "github.com/Guy2co/algo-crypto-trader-bot/internal/exchange/binance"
+	bybitclient "github.com/Guy2co/algo-crypto-trader-bot/internal/exchange/bybit"
+	"github.com/Guy2co/algo-crypto-trader-bot/internal/risk"
+	"github.com/Guy2co/algo-crypto-trader-bot/internal/strategy"
+	"github.com/Guy2co/algo-crypto-trader-bot/internal/strategy/arbitrage"
 	"github.com/Guy2co/algo-crypto-trader-bot/pkg/logger"
 
 	// Register strategies.
+	_ "github.com/Guy2co/algo-crypto-trader-bot/internal/strategy/arbitrage/register"
 	_ "github.com/Guy2co/algo-crypto-trader-bot/internal/strategy/grid/register"
 
 	"go.uber.org/zap"
@@ -50,23 +54,41 @@ func run() error {
 		return fmt.Errorf("BINANCE_API_KEY and BINANCE_SECRET_KEY env vars must be set")
 	}
 
-	ex, err := binanceexchange.NewClient(apiKey, secretKey, cfg.Exchange.Testnet, log)
+	primaryEx, err := binanceclient.NewClient(apiKey, secretKey, cfg.Exchange.Testnet, log)
 	if err != nil {
 		return fmt.Errorf("init exchange: %w", err)
 	}
 
-	strat, err := strategy.New(cfg.Strategy.Active, cfg, log)
-	if err != nil {
-		return fmt.Errorf("init strategy: %w", err)
+	var strat strategy.Strategy
+
+	if cfg.Strategy.Active == "arbitrage" {
+		// Build exchange list: always start with Binance.
+		exchanges := []binanceexchange.Exchange{primaryEx}
+
+		// Optionally add Bybit for cross-exchange arbitrage.
+		if bybitKey := os.Getenv("BYBIT_API_KEY"); bybitKey != "" {
+			bybitSecret := os.Getenv("BYBIT_SECRET_KEY")
+			bybitEx, bybitErr := bybitclient.NewClient(bybitKey, bybitSecret, cfg.Bybit.Testnet, log)
+			if bybitErr != nil {
+				return fmt.Errorf("init bybit exchange: %w", bybitErr)
+			}
+			exchanges = append(exchanges, bybitEx)
+			log.Info("bybit exchange enabled for cross-exchange arbitrage")
+		}
+
+		strat = arbitrage.New(cfg, exchanges, log)
+	} else {
+		strat, err = strategy.New(cfg.Strategy.Active, cfg, log)
+		if err != nil {
+			return fmt.Errorf("init strategy: %w", err)
+		}
 	}
 
 	riskMgr := risk.New(cfg.Risk, log)
-
-	b := bot.New(cfg, ex, strat, riskMgr, log)
+	b := bot.New(cfg, primaryEx, strat, riskMgr, log)
 
 	log.Info("starting algo trading bot",
 		zap.String("strategy", cfg.Strategy.Active),
-		zap.String("symbol", cfg.Grid.Symbol),
 		zap.Bool("testnet", cfg.Exchange.Testnet),
 	)
 
