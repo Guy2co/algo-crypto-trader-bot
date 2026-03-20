@@ -65,16 +65,9 @@ func (b *Bot) Run(ctx context.Context) error {
 	defer cancelStream()
 
 	// Seed equity baseline.
-	balances, err := b.exchange.GetBalances(ctx)
-	if err != nil {
-		return fmt.Errorf("get initial balances: %w", err)
+	if err = b.seedEquity(ctx, primarySym); err != nil {
+		return err
 	}
-	price, err := b.exchange.GetCurrentPrice(ctx, primarySym)
-	if err != nil {
-		return fmt.Errorf("get initial price: %w", err)
-	}
-	equity := risk.CalculateEquity(balances, b.cfg.Grid.BaseAsset, price)
-	b.risk.RecordEquity(equity)
 
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -122,6 +115,20 @@ func (b *Bot) primarySymbol() string {
 		return intermediate + quote
 	}
 	return b.cfg.Grid.Symbol
+}
+
+func (b *Bot) seedEquity(ctx context.Context, sym string) error {
+	balances, err := b.exchange.GetBalances(ctx)
+	if err != nil {
+		return fmt.Errorf("get initial balances: %w", err)
+	}
+	price, err := b.exchange.GetCurrentPrice(ctx, sym)
+	if err != nil {
+		return fmt.Errorf("get initial price: %w", err)
+	}
+	equity := risk.CalculateEquity(balances, b.cfg.Grid.BaseAsset, price)
+	b.risk.RecordEquity(equity)
+	return nil
 }
 
 func (b *Bot) handleFillEvent(ctx context.Context, event exchange.OrderFillEvent) error {
