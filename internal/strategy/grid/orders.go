@@ -23,7 +23,7 @@ func buildClientOrderID(symbol, runID string, levelIndex int, side exchange.Orde
 // initializeGrid places initial orders when the grid starts fresh.
 // Levels below currentPrice get BUY orders; levels above get SELL orders.
 // The level immediately below currentPrice acts as the first entry point.
-func (g *Strategy) initializeGrid(ctx context.Context, ex exchange.Exchange, currentPrice float64) error {
+func (g *Strategy) initializeGrid(ctx context.Context, ex exchange.Exchange, currentPrice float64) error { //nolint:unparam
 	prices := ComputeLevels(g.state.GridBottom, g.state.GridTop, g.state.GridCount)
 	qty := ComputeQuantityPerGrid(g.state.Investment, g.state.GridCount, currentPrice)
 

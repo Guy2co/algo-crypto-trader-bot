@@ -10,13 +10,15 @@ import (
 
 // Config is the top-level configuration structure.
 type Config struct {
-	Exchange ExchangeConfig `yaml:"exchange"`
-	Strategy StrategyConfig `yaml:"strategy"`
-	Grid     GridConfig     `yaml:"grid"`
-	Risk     RiskConfig     `yaml:"risk"`
-	Backtest BacktestConfig `yaml:"backtest"`
-	Logging  logger.Config  `yaml:"logging"`
-	State    StateConfig    `yaml:"state"`
+	Exchange  ExchangeConfig  `yaml:"exchange"`
+	Bybit     BybitConfig     `yaml:"bybit"`
+	Strategy  StrategyConfig  `yaml:"strategy"`
+	Grid      GridConfig      `yaml:"grid"`
+	Arbitrage ArbitrageConfig `yaml:"arbitrage"`
+	Risk      RiskConfig      `yaml:"risk"`
+	Backtest  BacktestConfig  `yaml:"backtest"`
+	Logging   logger.Config   `yaml:"logging"`
+	State     StateConfig     `yaml:"state"`
 }
 
 // ExchangeConfig holds exchange connectivity settings.
@@ -65,6 +67,26 @@ type BacktestConfig struct {
 	FeeRate             float64 `yaml:"fee_rate"`
 }
 
+// BybitConfig holds Bybit exchange connectivity settings.
+type BybitConfig struct {
+	Testnet         bool `yaml:"testnet"`
+	RESTTimeoutSecs int  `yaml:"rest_timeout_secs"`
+}
+
+// ArbitrageConfig holds all arbitrage strategy parameters.
+type ArbitrageConfig struct {
+	Type                string   `yaml:"type"`                 // "triangular" | "cross_exchange" | "both"
+	QuoteAssets         []string `yaml:"quote_assets"`         // e.g. ["USDT"]
+	IntermediateAssets  []string `yaml:"intermediate_assets"`  // e.g. ["BTC","ETH","BNB","SOL"]
+	MaxHops             int      `yaml:"max_hops"`             // 3 = triangular, 4 = quad
+	MinProfitPct        float64  `yaml:"min_profit_pct"`       // 0.15 = 0.15%
+	MaxTradeUSDT        float64  `yaml:"max_trade_usdt"`
+	FeeRate             float64  `yaml:"fee_rate"`
+	ScanIntervalMS      int      `yaml:"scan_interval_ms"`
+	OrderTimeoutSecs    int      `yaml:"order_timeout_secs"`
+	DryRun              bool     `yaml:"dry_run"`
+}
+
 // StateConfig holds state persistence settings.
 type StateConfig struct {
 	Dir                string `yaml:"dir"`
@@ -74,7 +96,7 @@ type StateConfig struct {
 // Load reads config from the given YAML file path, then overrides
 // API keys from environment variables.
 func Load(path string) (*Config, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is a user-supplied config file, not an injection risk
 	if err != nil {
 		return nil, fmt.Errorf("open config file: %w", err)
 	}

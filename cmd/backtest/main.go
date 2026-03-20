@@ -12,6 +12,7 @@ import (
 	"github.com/Guy2co/algo-crypto-trader-bot/pkg/logger"
 
 	// Register strategies.
+	_ "github.com/Guy2co/algo-crypto-trader-bot/internal/strategy/arbitrage/register"
 	_ "github.com/Guy2co/algo-crypto-trader-bot/internal/strategy/grid/register"
 )
 

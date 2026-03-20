@@ -61,6 +61,23 @@ func (b Balance) Total() float64 {
 	return b.Free + b.Locked
 }
 
+// BookTicker holds the best bid and ask for a symbol.
+type BookTicker struct {
+	Symbol   string
+	BidPrice float64
+	BidQty   float64
+	AskPrice float64
+	AskQty   float64
+}
+
+// MarketOrderRequest holds parameters for a market order.
+type MarketOrderRequest struct {
+	Symbol        string
+	Side          OrderSide
+	Quantity      float64
+	ClientOrderID string
+}
+
 // Candle represents an OHLCV candlestick, used for backtesting.
 type Candle struct {
 	OpenTime  time.Time
@@ -109,6 +126,10 @@ type Exchange interface {
 
 	// Streaming — returns a channel of fill events and a func to stop the stream.
 	SubscribeOrderFills(ctx context.Context, symbol string) (<-chan OrderFillEvent, context.CancelFunc, error)
+
+	// Arbitrage-specific
+	GetBookTicker(ctx context.Context, symbol string) (BookTicker, error)
+	PlaceMarketOrder(ctx context.Context, req MarketOrderRequest) (*Order, error)
 
 	// Precision helpers
 	FormatQuantity(symbol string, qty float64) (string, error)

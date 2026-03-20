@@ -286,6 +286,75 @@ func (m *Exchange) FormatPrice(_ string, price float64) (string, error) {
 	return fmt.Sprintf("%.2f", price), nil
 }
 
+// GetBookTicker returns a simulated 0.01% spread around the current price.
+func (m *Exchange) GetBookTicker(_ context.Context, symbol string) (exchange.BookTicker, error) {
+	m.mu.RLock()
+	price := m.currentPrice
+	m.mu.RUnlock()
+
+	spread := price * 0.0001
+	return exchange.BookTicker{
+		Symbol:   symbol,
+		BidPrice: price - spread,
+		BidQty:   100,
+		AskPrice: price + spread,
+		AskQty:   100,
+	}, nil
+}
+
+// PlaceMarketOrder fills immediately at the current price, deducting fees.
+func (m *Exchange) PlaceMarketOrder(ctx context.Context, req exchange.MarketOrderRequest) (*exchange.Order, error) {
+	m.mu.Lock()
+	price := m.currentPrice
+	m.mu.Unlock()
+
+	limitReq := exchange.PlaceOrderRequest{
+		Symbol:        req.Symbol,
+		Side:          req.Side,
+		Price:         price,
+		Quantity:      req.Quantity,
+		ClientOrderID: req.ClientOrderID,
+	}
+	order, err := m.PlaceLimitOrder(ctx, limitReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Immediately simulate the fill.
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.openOrders[order.OrderID]; !exists {
+		// Already removed (shouldn't happen)
+		return order, nil
+	}
+
+	fee := req.Quantity * price * m.feeRate
+	filledOrder := *order
+	filledOrder.Status = exchange.OrderStatusFilled
+	filledOrder.FilledQty = req.Quantity
+	delete(m.openOrders, order.OrderID)
+
+	m.applyFill(filledOrder, fee)
+
+	m.fillChan <- exchange.OrderFillEvent{
+		OrderID:         filledOrder.OrderID,
+		ClientOrderID:   filledOrder.ClientOrderID,
+		Symbol:          filledOrder.Symbol,
+		Side:            filledOrder.Side,
+		Price:           price,
+		Quantity:        req.Quantity,
+		CumulativeQty:   req.Quantity,
+		Status:          exchange.OrderStatusFilled,
+		Commission:      fee,
+		CommissionAsset: "USDT",
+		TradeID:         order.OrderID,
+	}
+
+	filledOrder.Price = price
+	return &filledOrder, nil
+}
+
 // TotalEquityUSDT returns the total portfolio value in USDT at the current price.
 func (m *Exchange) TotalEquityUSDT(baseAsset string) float64 {
 	m.mu.RLock()

@@ -63,36 +63,14 @@ func (c *Client) runStream(ctx context.Context, listenKey string, outCh chan<- e
 			return
 		}
 
-		doneC, stopC, err := gobinance.WsUserDataServe(
-			listenKey,
-			func(event *gobinance.WsUserDataEvent) {
-				if event.Event != gobinance.UserDataEventTypeExecutionReport {
-					return
-				}
-				orderUpdate := event.OrderUpdate
-			fill := mapWsOrderUpdate(&orderUpdate)
-				if fill.Status != exchange.OrderStatusFilled && fill.Status != exchange.OrderStatusPartiallyFilled {
-					return
-				}
-				select {
-				case outCh <- fill:
-				default:
-					c.logger.Warn("fill channel full, dropping event", zap.Int64("order_id", fill.OrderID))
-				}
-			},
-			func(err error) {
-				c.logger.Warn("ws user data stream error", zap.Error(err))
-			},
-		)
+		doneC, stopC, err := gobinance.WsUserDataServe(listenKey, c.makeFillHandler(outCh), c.wsErrHandler())
 		if err != nil {
 			c.logger.Error("ws user data connect failed", zap.Error(err), zap.Duration("retry_in", delay))
-			select {
-			case <-ctx.Done():
+			if !c.sleepOrCancel(ctx, delay) {
 				return
-			case <-time.After(delay):
-				delay = min(delay*2, reconnectMaxDelay)
-				continue
 			}
+			delay = min(delay*2, reconnectMaxDelay)
+			continue
 		}
 
 		c.logger.Info("ws user data stream connected")
@@ -104,13 +82,48 @@ func (c *Client) runStream(ctx context.Context, listenKey string, outCh chan<- e
 			return
 		case <-doneC:
 			c.logger.Warn("ws user data stream disconnected — reconnecting", zap.Duration("delay", delay))
-			select {
-			case <-ctx.Done():
+			if !c.sleepOrCancel(ctx, delay) {
 				return
-			case <-time.After(delay):
-				delay = min(delay*2, reconnectMaxDelay)
 			}
+			delay = min(delay*2, reconnectMaxDelay)
 		}
+	}
+}
+
+// makeFillHandler returns the WsUserDataServe handler that forwards fills to outCh.
+func (c *Client) makeFillHandler(outCh chan<- exchange.OrderFillEvent) func(*gobinance.WsUserDataEvent) {
+	return func(event *gobinance.WsUserDataEvent) {
+		if event.Event != gobinance.UserDataEventTypeExecutionReport {
+			return
+		}
+		orderUpdate := event.OrderUpdate
+		fill := mapWsOrderUpdate(&orderUpdate)
+		if fill.Status != exchange.OrderStatusFilled && fill.Status != exchange.OrderStatusPartiallyFilled {
+			return
+		}
+		select {
+		case outCh <- fill:
+		default:
+			c.logger.Warn("fill channel full, dropping event", zap.Int64("order_id", fill.OrderID))
+		}
+	}
+}
+
+// wsErrHandler returns the WsUserDataServe error handler.
+func (c *Client) wsErrHandler() func(error) {
+	return func(err error) {
+		c.logger.Warn("ws user data stream error", zap.Error(err))
+	}
+}
+
+// sleepOrCancel waits for the given duration or until ctx is cancelled.
+// Returns true if the sleep completed, false if the context was cancelled.
+func (c *Client) sleepOrCancel(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(d):
+		return true
 	}
 }
 

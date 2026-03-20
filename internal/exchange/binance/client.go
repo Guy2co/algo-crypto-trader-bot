@@ -268,6 +268,46 @@ func (c *Client) FormatQuantity(symbol string, qty float64) (string, error) {
 	return strconv.FormatFloat(qty, 'f', 8, 64), nil
 }
 
+func (c *Client) GetBookTicker(ctx context.Context, symbol string) (exchange.BookTicker, error) {
+	tickers, err := c.inner.NewListBookTickersService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return exchange.BookTicker{}, wrapAPIError("GetBookTicker", err)
+	}
+	if len(tickers) == 0 {
+		return exchange.BookTicker{}, fmt.Errorf("no book ticker for %s", symbol)
+	}
+	t := tickers[0]
+	bidPrice, _ := strconv.ParseFloat(t.BidPrice, 64)
+	bidQty, _ := strconv.ParseFloat(t.BidQuantity, 64)
+	askPrice, _ := strconv.ParseFloat(t.AskPrice, 64)
+	askQty, _ := strconv.ParseFloat(t.AskQuantity, 64)
+	return exchange.BookTicker{
+		Symbol:   t.Symbol,
+		BidPrice: bidPrice,
+		BidQty:   bidQty,
+		AskPrice: askPrice,
+		AskQty:   askQty,
+	}, nil
+}
+
+func (c *Client) PlaceMarketOrder(ctx context.Context, req exchange.MarketOrderRequest) (*exchange.Order, error) {
+	qtyStr, err := c.FormatQuantity(req.Symbol, req.Quantity)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.inner.NewCreateOrderService().
+		Symbol(req.Symbol).
+		Side(gobinance.SideType(req.Side)).
+		Type(gobinance.OrderTypeMarket).
+		Quantity(qtyStr).
+		NewClientOrderID(req.ClientOrderID).
+		Do(ctx)
+	if err != nil {
+		return nil, wrapAPIError("PlaceMarketOrder", err)
+	}
+	return mapCreateOrder(resp)
+}
+
 func roundToTick(price, tick float64) float64 {
 	if tick == 0 {
 		return price

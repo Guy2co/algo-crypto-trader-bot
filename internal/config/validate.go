@@ -16,8 +16,15 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("strategy.active is required"))
 	}
 
-	if err := c.Grid.validate(); err != nil {
-		errs = append(errs, fmt.Errorf("grid: %w", err))
+	if c.Strategy.Active == "grid" {
+		if err := c.Grid.validate(); err != nil {
+			errs = append(errs, fmt.Errorf("grid: %w", err))
+		}
+	}
+	if c.Strategy.Active == "arbitrage" {
+		if err := c.Arbitrage.validate(); err != nil {
+			errs = append(errs, fmt.Errorf("arbitrage: %w", err))
+		}
 	}
 	if err := c.Risk.validate(); err != nil {
 		errs = append(errs, fmt.Errorf("risk: %w", err))
@@ -45,6 +52,23 @@ func (g GridConfig) validate() error {
 	}
 	if g.TotalInvestment <= 0 {
 		errs = append(errs, errors.New("total_investment must be > 0"))
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func (a ArbitrageConfig) validate() error {
+	var errs []error
+	if a.MaxTradeUSDT <= 0 {
+		errs = append(errs, errors.New("max_trade_usdt must be > 0"))
+	}
+	if a.MinProfitPct < 0 {
+		errs = append(errs, errors.New("min_profit_pct must be >= 0"))
+	}
+	if len(a.IntermediateAssets) < 2 {
+		errs = append(errs, errors.New("intermediate_assets must have at least 2 assets"))
 	}
 	if len(errs) > 0 {
 		return errors.Join(errs...)
