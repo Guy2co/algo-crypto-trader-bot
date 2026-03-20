@@ -246,34 +246,32 @@ func (g *Strategy) onSellFill(ctx context.Context, ex exchange.Exchange, levelId
 
 // placeBuy sends a limit BUY order and returns the exchange-assigned order ID.
 func (g *Strategy) placeBuy(ctx context.Context, ex exchange.Exchange, levelIdx int, price, qty float64) (int64, error) {
-	clientOID := buildClientOrderID(g.state.Symbol, g.state.RunID, levelIdx, exchange.OrderSideBuy)
-	order, err := ex.PlaceLimitOrder(ctx, exchange.PlaceOrderRequest{
-		Symbol:        g.state.Symbol,
-		Side:          exchange.OrderSideBuy,
-		Price:         price,
-		Quantity:      qty,
-		ClientOrderID: clientOID,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("place buy at level %d price %.2f: %w", levelIdx, price, err)
-	}
-	g.logger.Debug("buy order placed", zap.Int("level", levelIdx), zap.Float64("price", price), zap.Int64("order_id", order.OrderID))
-	return order.OrderID, nil
+	return g.placeGridOrder(ctx, ex, exchange.OrderSideBuy, levelIdx, price, qty)
 }
 
 // placeSell sends a limit SELL order and returns the exchange-assigned order ID.
 func (g *Strategy) placeSell(ctx context.Context, ex exchange.Exchange, levelIdx int, price, qty float64) (int64, error) {
-	clientOID := buildClientOrderID(g.state.Symbol, g.state.RunID, levelIdx, exchange.OrderSideSell)
+	return g.placeGridOrder(ctx, ex, exchange.OrderSideSell, levelIdx, price, qty)
+}
+
+// placeGridOrder places a limit order at a grid level and returns the exchange order ID.
+func (g *Strategy) placeGridOrder(ctx context.Context, ex exchange.Exchange, side exchange.OrderSide, levelIdx int, price, qty float64) (int64, error) {
+	clientOID := buildClientOrderID(g.state.Symbol, g.state.RunID, levelIdx, side)
 	order, err := ex.PlaceLimitOrder(ctx, exchange.PlaceOrderRequest{
 		Symbol:        g.state.Symbol,
-		Side:          exchange.OrderSideSell,
+		Side:          side,
 		Price:         price,
 		Quantity:      qty,
 		ClientOrderID: clientOID,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("place sell at level %d price %.2f: %w", levelIdx, price, err)
+		return 0, fmt.Errorf("place %s at level %d price %.2f: %w", side, levelIdx, price, err)
 	}
-	g.logger.Debug("sell order placed", zap.Int("level", levelIdx), zap.Float64("price", price), zap.Int64("order_id", order.OrderID))
+	g.logger.Debug("grid order placed",
+		zap.String("side", string(side)),
+		zap.Int("level", levelIdx),
+		zap.Float64("price", price),
+		zap.Int64("order_id", order.OrderID),
+	)
 	return order.OrderID, nil
 }

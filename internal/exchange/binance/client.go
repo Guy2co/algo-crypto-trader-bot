@@ -77,16 +77,7 @@ func (c *Client) GetBalances(ctx context.Context) ([]exchange.Balance, error) {
 }
 
 func (c *Client) GetBalance(ctx context.Context, asset string) (exchange.Balance, error) {
-	balances, err := c.GetBalances(ctx)
-	if err != nil {
-		return exchange.Balance{}, err
-	}
-	for _, b := range balances {
-		if b.Asset == asset {
-			return b, nil
-		}
-	}
-	return exchange.Balance{Asset: asset}, nil
+	return exchange.GetBalanceSingle(ctx, c, asset)
 }
 
 // --- Orders ---
@@ -237,8 +228,8 @@ func (c *Client) FormatPrice(symbol string, price float64) (string, error) {
 			if tickStr != "" {
 				tick, err := strconv.ParseFloat(tickStr, 64)
 				if err == nil && tick > 0 {
-					rounded := roundToTick(price, tick)
-					decimals := countDecimals(tickStr)
+					rounded := exchange.RoundToTickSize(price, tick)
+					decimals := exchange.CountDecimals(tickStr)
 					return strconv.FormatFloat(rounded, 'f', decimals, 64), nil
 				}
 			}
@@ -258,8 +249,8 @@ func (c *Client) FormatQuantity(symbol string, qty float64) (string, error) {
 			if stepStr != "" {
 				step, err := strconv.ParseFloat(stepStr, 64)
 				if err == nil && step > 0 {
-					rounded := roundToStep(qty, step)
-					decimals := countDecimals(stepStr)
+					rounded := exchange.RoundToStepSize(qty, step)
+					decimals := exchange.CountDecimals(stepStr)
 					return strconv.FormatFloat(rounded, 'f', decimals, 64), nil
 				}
 			}
@@ -308,25 +299,3 @@ func (c *Client) PlaceMarketOrder(ctx context.Context, req exchange.MarketOrderR
 	return mapCreateOrder(resp)
 }
 
-func roundToTick(price, tick float64) float64 {
-	if tick == 0 {
-		return price
-	}
-	return float64(int64(price/tick)) * tick
-}
-
-func roundToStep(qty, step float64) float64 {
-	if step == 0 {
-		return qty
-	}
-	return float64(int64(qty/step)) * step
-}
-
-func countDecimals(s string) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '.' {
-			return len(s) - i - 1
-		}
-	}
-	return 0
-}

@@ -1,6 +1,6 @@
 package grid
 
-import "math"
+import "github.com/Guy2co/algo-crypto-trader-bot/internal/exchange"
 
 // ComputeLevels returns count+1 evenly-spaced price levels between bottom and top
 // (inclusive), forming count intervals.
@@ -38,17 +38,13 @@ func ComputeTheoreticalProfit(gridSpacing, avgPrice, feeRate float64) float64 {
 }
 
 // RoundToTickSize rounds a price down to the nearest valid exchange tick size.
+// Delegates to exchange.RoundToTickSize.
 func RoundToTickSize(price, tickSize float64) float64 {
-	if tickSize == 0 {
-		return price
-	}
-	return math.Floor(price/tickSize) * tickSize
+	return exchange.RoundToTickSize(price, tickSize)
 }
 
 // RoundToStepSize rounds a quantity down to the nearest valid exchange lot step size.
+// Delegates to exchange.RoundToStepSize.
 func RoundToStepSize(qty, stepSize float64) float64 {
-	if stepSize == 0 {
-		return qty
-	}
-	return math.Floor(qty/stepSize) * stepSize
+	return exchange.RoundToStepSize(qty, stepSize)
 }

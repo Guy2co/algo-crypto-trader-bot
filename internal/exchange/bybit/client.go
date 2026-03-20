@@ -63,16 +63,7 @@ func (c *Client) GetBalances(_ context.Context) ([]exchange.Balance, error) {
 }
 
 func (c *Client) GetBalance(ctx context.Context, asset string) (exchange.Balance, error) {
-	balances, err := c.GetBalances(ctx)
-	if err != nil {
-		return exchange.Balance{}, err
-	}
-	for _, b := range balances {
-		if b.Asset == asset {
-			return b, nil
-		}
-	}
-	return exchange.Balance{Asset: asset}, nil
+	return exchange.GetBalanceSingle(ctx, c, asset)
 }
 
 // --- Orders ---
