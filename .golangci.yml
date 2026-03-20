@@ -57,7 +57,7 @@ linters:
         text: "G115"
       # "strat" is a widely used abbreviation for "strategy" in this codebase.
       - linters: [misspell]
-        text: "'strat'"
+        text: "strat.*misspelling"
       # (nil, nil) is intentional in state loaders: nil pointer = "no saved state".
       - linters: [nilnil]
         path: "state\\.go$"
