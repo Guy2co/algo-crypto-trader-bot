@@ -1,0 +1,57 @@
+version: "2"
+linters:
+  default: standard
+  enable:
+    # --- bugs & correctness ---
+    - staticcheck
+    - bodyclose
+    - errorlint
+    - nilerr
+    - nilnil
+    - makezero
+    - durationcheck
+
+    # --- security ---
+    - gosec
+
+    # --- performance ---
+    - prealloc
+    - perfsprint
+
+    # --- code quality ---
+    - gocritic
+    - unparam
+    - unconvert
+    - wastedassign
+    - mirror
+    - musttag
+
+    # --- logging ---
+    - loggercheck
+
+    # --- maintainability ---
+    - cyclop
+    - nestif
+    - misspell
+
+  settings:
+    cyclop:
+      max-complexity: 12
+    nestif:
+      min-complexity: 5
+    gosec:
+      excludes:
+        - G104
+        - G704
+
+  exclusions:
+    rules:
+      - linters: [perfsprint]
+        text: "can be replaced with string concatenation"
+      - linters: [perfsprint]
+        text: "can be replaced with errors.New"
+      - linters: [gocritic]
+        text: "exitAfterDefer"
+        path: "cmd/.*/main.go"
+      - linters: [gosec]
+        text: "G115"

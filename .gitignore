@@ -1,0 +1,8 @@
+bin/
+data/*.csv
+state/*.json
+*.env
+.env
+configs/*.local.yaml
+configs/config.testnet.yaml
+logs/

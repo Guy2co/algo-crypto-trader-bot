@@ -1,0 +1,45 @@
+exchange:
+  name: "binance"
+  testnet: false
+  rest_timeout_secs: 10
+  ws_reconnect_max_attempts: 10
+
+strategy:
+  active: "grid"
+
+grid:
+  symbol: "BTCUSDT"
+  quote_asset: "USDT"
+  base_asset: "BTC"
+  grid_bottom: 80000.0
+  grid_top: 100000.0
+  grid_count: 20
+  total_investment: 1000.0
+  fee_rate: 0.001
+
+risk:
+  max_position_usdt: 1100.0
+  stop_loss_pct: 5.0
+  max_drawdown_pct: 15.0
+  max_open_orders: 50
+  order_cooldown_secs: 1
+  cancel_on_stop: false
+
+backtest:
+  data_dir: "./data"
+  symbol: "BTCUSDT"
+  interval: "1h"
+  start_date: "2024-01-01"
+  end_date: "2024-12-31"
+  initial_balance_usdt: 10000.0
+  fee_rate: 0.001
+
+logging:
+  level: "info"
+  format: "json"
+  output_path: "stdout"
+  error_output_path: "stderr"
+
+state:
+  dir: "./state"
+  flush_interval_secs: 30
