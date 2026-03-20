@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Guy2co/algo-crypto-trader-bot/internal/config"
@@ -27,6 +28,7 @@ type Strategy struct {
 	state     *ArbState
 	stateDir  string
 	cancel    context.CancelFunc
+	wg        sync.WaitGroup
 	cycleNum  int
 	logger    *zap.Logger
 }
@@ -84,6 +86,7 @@ func (s *Strategy) Init(ctx context.Context, ex exchange.Exchange) error {
 
 	scanCtx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
+	s.wg.Add(1)
 	go s.scanLoop(scanCtx)
 
 	return nil
@@ -117,6 +120,8 @@ func (s *Strategy) buildPaths() {
 }
 
 func (s *Strategy) scanLoop(ctx context.Context) {
+	defer s.wg.Done()
+
 	interval := time.Duration(s.cfg.Arbitrage.ScanIntervalMS) * time.Millisecond
 	if interval <= 0 {
 		interval = 500 * time.Millisecond
@@ -217,12 +222,13 @@ func (s *Strategy) OnTick(_ context.Context, _ exchange.Exchange) error {
 	return nil
 }
 
-// Stop cancels the scan loop and saves state.
+// Stop cancels the scan loop, waits for it to exit, then saves state.
 func (s *Strategy) Stop(_ context.Context, _ exchange.Exchange) error {
 	s.logger.Info("stopping arbitrage strategy")
 	if s.cancel != nil {
 		s.cancel()
 	}
+	s.wg.Wait() // ensure scan goroutine has fully exited before writing state
 
 	if err := s.state.save(s.stateDir); err != nil {
 		return fmt.Errorf("save state on stop: %w", err)
